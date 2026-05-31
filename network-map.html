@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Eileen Wang — Spy Network Map</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0d14;
+      --surface: #111520;
+      --surface2: #1a2033;
+      --border: #2a3550;
+      --text: #d0d8f0;
+      --text-dim: #7080a8;
+      --accent: #e05a5a;
+      --accent2: #f0a040;
+      --blue: #4a90d9;
+      --green: #4ac07a;
+      --red: #e05050;
+      --purple: #9a60e0;
+
+      --col-suspect: #e05a5a;
+      --col-foreign: #c04080;
+      --col-law: #4a90d9;
+      --col-location: #60a890;
+      --col-event: #f0a040;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 10px 16px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-title { flex: 1; min-width: 0; }
+    .header-title h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .header-title p {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 1px;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    button {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    button:hover { color: var(--text); border-color: #4a5a80; }
+    button.active { color: var(--accent); border-color: var(--accent); }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    #graph-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #graph-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    #graph-svg:active { cursor: grabbing; }
+
+    /* Links */
+    .link {
+      stroke-width: 1.5;
+      fill: none;
+      opacity: 0.6;
+    }
+    .link.foreign   { stroke: var(--col-foreign); }
+    .link.domestic  { stroke: #4a5a80; }
+    .link.legal     { stroke: var(--col-law); }
+    .link.financial { stroke: var(--col-event); }
+
+    .link-label {
+      font-size: 9px;
+      fill: var(--text-dim);
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    /* Nodes */
+    .node { cursor: pointer; }
+    .node circle, .node rect, .node polygon {
+      stroke-width: 2;
+      transition: filter 0.15s;
+    }
+    .node:hover circle,
+    .node:hover rect,
+    .node:hover polygon {
+      filter: brightness(1.4);
+    }
+    .node.selected circle,
+    .node.selected rect,
+    .node.selected polygon {
+      stroke-width: 3;
+      filter: brightness(1.3) drop-shadow(0 0 8px currentColor);
+    }
+
+    .node-label {
+      font-size: 11px;
+      fill: var(--text);
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: auto;
+      font-weight: 500;
+    }
+    .node-sublabel {
+      font-size: 9px;
+      fill: var(--text-dim);
+      pointer-events: none;
+      text-anchor: middle;
+    }
+
+    /* Detail panel */
+    #detail-panel {
+      width: 280px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.25s, opacity 0.25s;
+      overflow: hidden;
+    }
+    #detail-panel.hidden { width: 0; opacity: 0; }
+
+    .detail-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .detail-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .detail-info { flex: 1; min-width: 0; }
+    .detail-info h2 {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .detail-info .detail-role {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .detail-body { padding: 12px 16px; overflow-y: auto; flex: 1; }
+
+    .detail-section { margin-bottom: 14px; }
+    .detail-section h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .detail-section p {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 2px 2px 2px 0;
+    }
+    .badge-guilty   { background: #3a1515; color: #f06060; border: 1px solid #6a2020; }
+    .badge-convicted{ background: #3a2010; color: #f09040; border: 1px solid #6a4010; }
+    .badge-foreign  { background: #2a1535; color: #b060e0; border: 1px solid #5a2570; }
+    .badge-location { background: #0f2520; color: #40b080; border: 1px solid #1a5040; }
+    .badge-law      { background: #0f1f35; color: #4090d0; border: 1px solid #1a3a60; }
+
+    .connection-list { list-style: none; }
+    .connection-list li {
+      font-size: 12px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .connection-list li:last-child { border-bottom: none; }
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .conn-text { flex: 1; line-height: 1.4; }
+    .conn-rel { font-size: 10px; color: var(--text-dim); }
+
+    .close-btn {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    /* Legend */
+    #legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(17,21,32,0.92);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+      pointer-events: none;
+    }
+    .legend-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 7px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 4px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-diamond {
+      width: 10px;
+      height: 10px;
+      flex-shrink: 0;
+      transform: rotate(45deg);
+    }
+
+    /* Zoom controls */
+    #zoom-controls {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #zoom-controls button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+    }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      header { padding: 8px 12px; }
+      .header-title h1 { font-size: 13px; }
+      .header-title p { display: none; }
+
+      #detail-panel {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 85vw !important;
+        max-width: 320px;
+        z-index: 30;
+        border-left: 1px solid var(--border);
+      }
+      #detail-panel.hidden { width: 0 !important; }
+
+      .close-btn { display: flex !important; }
+
+      #legend { display: none; }
+    }
+
+    /* Pulse animation for central node */
+    @keyframes pulse {
+      0%   { opacity: 0.6; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+    .node.central .pulse-ring {
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      pointer-events: none;
+      max-width: 180px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .tooltip.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <h1>Eileen Wang — Spy Network</h1>
+    <p>Foreign influence operation · Southern California · 2022–2026</p>
+  </div>
+  <div class="header-controls">
+    <button id="btn-layout" title="Toggle layout">↺ Reset</button>
+    <button id="btn-labels" class="active" title="Toggle labels">Labels</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div id="graph-container">
+    <svg id="graph-svg"></svg>
+
+    <div id="legend">
+      <div class="legend-title">Node types</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--col-suspect)"></div> Defendant / suspect</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--col-foreign)"></div> Foreign state actor</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--col-law)"></div> Law enforcement</div>
+      <div class="legend-item"><div class="legend-diamond" style="background:var(--col-location)"></div> Location</div>
+      <div class="legend-item"><div class="legend-diamond" style="background:var(--col-event)"></div> Event / outcome</div>
+    </div>
+
+    <div id="zoom-controls">
+      <button id="btn-zoom-in">+</button>
+      <button id="btn-zoom-out">−</button>
+    </div>
+  </div>
+
+  <div id="detail-panel" class="hidden">
+    <button class="close-btn" id="btn-close-panel">✕</button>
+    <div class="detail-header">
+      <div class="detail-icon" id="dp-icon"></div>
+      <div class="detail-info">
+        <h2 id="dp-name">—</h2>
+        <div class="detail-role" id="dp-role">—</div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-section" id="dp-status-section">
+        <h3>Status</h3>
+        <div id="dp-badges"></div>
+      </div>
+      <div class="detail-section">
+        <h3>Details</h3>
+        <p id="dp-details">—</p>
+      </div>
+      <div class="detail-section" id="dp-connections-section">
+        <h3>Connections</h3>
+        <ul class="connection-list" id="dp-connections"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ──────────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────────
+const nodes = [
+  {
+    id: 'wang',
+    label: 'Eileen Wang',
+    sublabel: 'Mayor · Arcadia',
+    type: 'person',
+    category: 'suspect',
+    icon: '👤',
+    role: 'Former Mayor of Arcadia, CA',
+    status: ['Pleaded Guilty'],
+    statusClasses: ['badge-guilty'],
+    details: 'Former Mayor of Arcadia (Los Angeles County). Admitted to acting as an illegal unregistered agent of the Chinese government. Resigned as part of her plea agreement. Faces up to 10 years federal prison. Chinese officials celebrated her 2022 election victory and designated her a "new political star," predicting she would oppose Taiwanese independence.',
+    r: 28,
+    central: true,
+  },
+  {
+    id: 'sun',
+    label: 'Yaoning "Mike" Sun',
+    sublabel: 'Campaign Manager',
+    type: 'person',
+    category: 'suspect',
+    icon: '👤',
+    role: "Wang's campaign manager, business partner & former fiancé",
+    status: ['Pleaded Guilty', '40 months prison'],
+    statusClasses: ['badge-guilty', 'badge-convicted'],
+    details: "Wang's campaign manager, business partner, and former fiancé. Acted as intermediary between Wang and John Chen. Compiled lists of U.S. politicians for Beijing. Reported directly to Chen. Pleaded guilty to conspiracy and acting as an illegal foreign agent. Sentenced to 40 months in federal prison in early 2026.",
+    r: 22,
+  },
+  {
+    id: 'chen',
+    label: 'John Chen',
+    sublabel: 'Coordinator',
+    type: 'person',
+    category: 'suspect',
+    icon: '👤',
+    role: 'Central coordinator between U.S. network and Chinese officials',
+    status: ['Convicted', '20 months prison'],
+    statusClasses: ['badge-convicted', 'badge-convicted'],
+    details: 'Central figure coordinating the influence operation between the U.S.-based network and Chinese government officials. Instructed Sun; maintained direct ties to Beijing. Convicted of acting as an unregistered Chinese agent and IRS bribery (2024). Sentenced to 20 months federal prison. Allegedly boasted to a fellow inmate about being a Chinese spy and claimed Chinese intelligence is "100 times better than the FBI."',
+    r: 22,
+  },
+  {
+    id: 'prc',
+    label: 'PRC Government',
+    sublabel: 'People\'s Republic of China',
+    type: 'org',
+    category: 'foreign',
+    icon: '🏛',
+    role: 'Foreign state principal directing the influence operation',
+    status: ['Foreign State Actor'],
+    statusClasses: ['badge-foreign'],
+    details: 'The Chinese government served as the ultimate principal of the influence operation. Officials celebrated Wang\'s 2022 Arcadia election victory, designated her a "new political star," and predicted she would oppose Taiwanese independence. Beijing\'s goal: build political influence in Southern California\'s Chinese-American community.',
+    r: 24,
+  },
+  {
+    id: 'intel',
+    label: 'Chinese Intelligence',
+    sublabel: 'PRC intelligence org.',
+    type: 'org',
+    category: 'foreign',
+    icon: '🕵',
+    role: 'Chinese intelligence organization referenced by Chen',
+    status: ['Foreign Intelligence'],
+    statusClasses: ['badge-foreign'],
+    details: 'Referenced by John Chen when boasting to a fellow inmate: claimed Chinese intelligence is "100 times better than the FBI." The specific Chinese intelligence organ was not publicly named in charging documents.',
+    r: 18,
+  },
+  {
+    id: 'arcadia',
+    label: 'Arcadia, CA',
+    sublabel: 'Los Angeles County',
+    type: 'location',
+    category: 'location',
+    icon: '📍',
+    role: "Wang's political base and target municipality",
+    status: ['Location'],
+    statusClasses: ['badge-location'],
+    details: "City in Los Angeles County, CA with a large Chinese-American population. Wang served as mayor here. The city was the focal point of the influence operation — gaining a seat in Arcadia city government gave Beijing a foothold in local Southern California politics.",
+    r: 16,
+  },
+  {
+    id: 'socal',
+    label: 'Southern California',
+    sublabel: 'Target region',
+    type: 'location',
+    category: 'location',
+    icon: '📍',
+    role: 'Broader regional target of Chinese influence operations',
+    status: ['Location'],
+    statusClasses: ['badge-location'],
+    details: 'Southern California — with its large Chinese-American diaspora and proximity to major U.S. institutions — was the broader operational theatre for PRC influence activities described in the case.',
+    r: 14,
+  },
+  {
+    id: 'doj',
+    label: 'Federal Prosecutors',
+    sublabel: 'U.S. DOJ',
+    type: 'org',
+    category: 'law',
+    icon: '⚖',
+    role: 'Investigated and prosecuted all three defendants',
+    status: ['Law Enforcement'],
+    statusClasses: ['badge-law'],
+    details: 'U.S. federal investigators and prosecutors brought charges against Wang, Sun, and Chen under statutes prohibiting acting as unregistered foreign agents. All three defendants were convicted or pleaded guilty.',
+    r: 18,
+  },
+  {
+    id: 'victory2022',
+    label: '2022 Election Win',
+    sublabel: 'Celebrated by Beijing',
+    type: 'event',
+    category: 'event',
+    icon: '🗳',
+    role: "Wang's 2022 Arcadia election — celebrated by Chinese officials",
+    status: ['Key Event'],
+    statusClasses: ['badge-convicted'],
+    details: "Wang won the 2022 Arcadia mayoral election. Chinese officials celebrated this result and designated Wang a \"new political star\" for Beijing's influence network. This election victory was a key milestone in the influence operation.",
+    r: 14,
+  },
+  {
+    id: 'pollist',
+    label: 'Politicians List',
+    sublabel: 'Compiled for Beijing',
+    type: 'event',
+    category: 'event',
+    icon: '📋',
+    role: 'Dossiers on U.S. politicians compiled by Sun for PRC',
+    status: ['Intelligence Product'],
+    statusClasses: ['badge-convicted'],
+    details: 'Sun compiled lists/dossiers of U.S. politicians on behalf of Beijing. This intelligence product was delivered to Chinese government handlers, helping Beijing map and target potential influenceable officials in Southern California and beyond.',
+    r: 14,
+  },
+];
+
+const links = [
+  // Wang connections
+  { source: 'sun',   target: 'wang',     label: 'campaign manager',     category: 'domestic' },
+  { source: 'sun',   target: 'wang',     label: 'former fiancé',        category: 'domestic' },
+  { source: 'wang',  target: 'prc',      label: 'illegal agent of',     category: 'foreign' },
+  { source: 'wang',  target: 'arcadia',  label: 'former mayor',         category: 'domestic' },
+  { source: 'wang',  target: 'victory2022', label: 'won',               category: 'domestic' },
+  { source: 'doj',   target: 'wang',     label: 'prosecuted',           category: 'legal' },
+
+  // Sun connections
+  { source: 'sun',   target: 'chen',     label: 'reported to',          category: 'foreign' },
+  { source: 'sun',   target: 'pollist',  label: 'compiled',             category: 'foreign' },
+  { source: 'doj',   target: 'sun',      label: 'prosecuted',           category: 'legal' },
+
+  // Chen connections
+  { source: 'chen',  target: 'prc',      label: 'maintained ties to',   category: 'foreign' },
+  { source: 'chen',  target: 'intel',    label: 'boasted about',        category: 'foreign' },
+  { source: 'chen',  target: 'sun',      label: 'instructed',           category: 'foreign' },
+  { source: 'doj',   target: 'chen',     label: 'prosecuted',           category: 'legal' },
+
+  // PRC connections
+  { source: 'prc',   target: 'victory2022', label: 'celebrated',        category: 'foreign' },
+  { source: 'prc',   target: 'pollist',  label: 'received',             category: 'foreign' },
+  { source: 'intel', target: 'prc',      label: 'arm of',               category: 'foreign' },
+
+  // Location
+  { source: 'arcadia', target: 'socal',  label: 'part of',              category: 'domestic' },
+];
+
+// Build adjacency for detail panel
+const adjacency = {};
+nodes.forEach(n => { adjacency[n.id] = []; });
+links.forEach(l => {
+  const sid = typeof l.source === 'object' ? l.source.id : l.source;
+  const tid = typeof l.target === 'object' ? l.target.id : l.target;
+  adjacency[sid].push({ peer: tid,   rel: l.label, dir: '→', cat: l.category });
+  adjacency[tid].push({ peer: sid,   rel: l.label, dir: '←', cat: l.category });
+});
+
+// ──────────────────────────────────────────────
+// GRAPH SETUP
+// ──────────────────────────────────────────────
+const container = document.getElementById('graph-container');
+const svg = d3.select('#graph-svg');
+const tooltip = document.getElementById('tooltip');
+
+const g = svg.append('g').attr('class', 'canvas');
+
+// Arrow markers
+const defs = svg.append('defs');
+['foreign','domestic','legal','financial'].forEach(cat => {
+  defs.append('marker')
+    .attr('id', `arrow-${cat}`)
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 20)
+    .attr('refY', 0)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', cat === 'foreign' ? 'var(--col-foreign)' : cat === 'legal' ? 'var(--col-law)' : '#4a5a80');
+});
+
+const colorMap = {
+  suspect:  'var(--col-suspect)',
+  foreign:  'var(--col-foreign)',
+  law:      'var(--col-law)',
+  location: 'var(--col-location)',
+  event:    'var(--col-event)',
+};
+
+// ──────────────────────────────────────────────
+// FORCE SIMULATION
+// ──────────────────────────────────────────────
+let W = container.clientWidth;
+let H = container.clientHeight;
+
+const sim = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
+    const s = d.source, t = d.target;
+    const sid = typeof s === 'object' ? s.id : s;
+    const tid = typeof t === 'object' ? t.id : t;
+    if (sid === 'wang' || tid === 'wang') return 140;
+    if (sid === 'prc' || tid === 'prc') return 130;
+    return 110;
+  }).strength(0.4))
+  .force('charge', d3.forceManyBody().strength(d => -300 - d.r * 8))
+  .force('center', d3.forceCenter(W / 2, H / 2))
+  .force('collision', d3.forceCollide().radius(d => d.r + 30))
+  .force('x', d3.forceX(W / 2).strength(0.04))
+  .force('y', d3.forceY(H / 2).strength(0.04));
+
+// Link group
+const linkGroup = g.append('g').attr('class', 'links');
+const nodeGroup = g.append('g').attr('class', 'nodes');
+const labelGroup = g.append('g').attr('class', 'link-labels');
+
+// Draw links
+const linkSel = linkGroup.selectAll('.link')
+  .data(links)
+  .join('line')
+  .attr('class', d => `link ${d.category}`)
+  .attr('marker-end', d => `url(#arrow-${d.category})`);
+
+// Link labels
+const linkLabelSel = labelGroup.selectAll('.link-label')
+  .data(links)
+  .join('text')
+  .attr('class', 'link-label')
+  .text(d => d.label);
+
+// Draw nodes
+const nodeSel = nodeGroup.selectAll('.node')
+  .data(nodes)
+  .join('g')
+  .attr('class', d => `node ${d.central ? 'central' : ''}`)
+  .call(d3.drag()
+    .on('start', dragStart)
+    .on('drag', dragged)
+    .on('end', dragEnd)
+  )
+  .on('click', (event, d) => {
+    event.stopPropagation();
+    selectNode(d);
+  })
+  .on('mouseenter', (event, d) => showTooltip(event, d))
+  .on('mousemove', (event) => moveTooltip(event))
+  .on('mouseleave', hideTooltip);
+
+// Pulse ring for central node
+nodeSel.filter(d => d.central).append('circle')
+  .attr('class', 'pulse-ring')
+  .attr('r', d => d.r + 10)
+  .attr('fill', 'none')
+  .attr('stroke', 'var(--col-suspect)')
+  .attr('stroke-width', 1)
+  .attr('opacity', 0.4);
+
+// Shape by type
+nodeSel.each(function(d) {
+  const sel = d3.select(this);
+  const col = colorMap[d.category] || '#888';
+
+  if (d.type === 'location' || d.type === 'event') {
+    // Diamond
+    const s = d.r;
+    sel.append('polygon')
+      .attr('points', `0,${-s} ${s},0 0,${s} ${-s},0`)
+      .attr('fill', col)
+      .attr('fill-opacity', 0.18)
+      .attr('stroke', col);
+  } else if (d.type === 'org') {
+    // Rounded rect
+    const w = d.r * 1.8, h = d.r * 1.4;
+    sel.append('rect')
+      .attr('x', -w/2).attr('y', -h/2)
+      .attr('width', w).attr('height', h)
+      .attr('rx', 6)
+      .attr('fill', col)
+      .attr('fill-opacity', 0.18)
+      .attr('stroke', col);
+  } else {
+    // Circle
+    sel.append('circle')
+      .attr('r', d.r)
+      .attr('fill', col)
+      .attr('fill-opacity', 0.18)
+      .attr('stroke', col);
+  }
+
+  // Icon
+  sel.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('font-size', d.r * 0.75)
+    .attr('y', -2)
+    .attr('pointer-events', 'none')
+    .text(d.icon);
+});
+
+// Node labels
+nodeSel.append('text')
+  .attr('class', 'node-label')
+  .attr('y', d => d.r + 13)
+  .text(d => d.label);
+
+nodeSel.append('text')
+  .attr('class', 'node-sublabel')
+  .attr('y', d => d.r + 24)
+  .text(d => d.sublabel);
+
+// ──────────────────────────────────────────────
+// SIMULATION TICK
+// ──────────────────────────────────────────────
+sim.on('tick', () => {
+  linkSel
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  linkLabelSel
+    .attr('x', d => (d.source.x + d.target.x) / 2)
+    .attr('y', d => (d.source.y + d.target.y) / 2);
+
+  nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+
+// ──────────────────────────────────────────────
+// ZOOM & PAN
+// ──────────────────────────────────────────────
+const zoom = d3.zoom()
+  .scaleExtent([0.2, 4])
+  .on('zoom', event => {
+    g.attr('transform', event.transform);
+  });
+
+svg.call(zoom).on('dblclick.zoom', null);
+
+svg.on('click', () => deselectNode());
+
+document.getElementById('btn-zoom-in').addEventListener('click', () => {
+  svg.transition().call(zoom.scaleBy, 1.4);
+});
+document.getElementById('btn-zoom-out').addEventListener('click', () => {
+  svg.transition().call(zoom.scaleBy, 0.7);
+});
+document.getElementById('btn-layout').addEventListener('click', () => {
+  svg.transition().duration(600).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(W/2, H/2).scale(1).translate(-W/2, -H/2)
+  );
+  nodes.forEach(n => { delete n.fx; delete n.fy; });
+  sim.alpha(0.6).restart();
+});
+
+// ──────────────────────────────────────────────
+// DRAG
+// ──────────────────────────────────────────────
+function dragStart(event, d) {
+  if (!event.active) sim.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) {
+  d.fx = event.x; d.fy = event.y;
+}
+function dragEnd(event, d) {
+  if (!event.active) sim.alphaTarget(0);
+}
+
+// ──────────────────────────────────────────────
+// TOOLTIP
+// ──────────────────────────────────────────────
+function showTooltip(event, d) {
+  tooltip.textContent = d.role;
+  tooltip.classList.add('visible');
+  moveTooltip(event);
+}
+function moveTooltip(event) {
+  const x = event.clientX + 12, y = event.clientY - 28;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+// ──────────────────────────────────────────────
+// DETAIL PANEL
+// ──────────────────────────────────────────────
+let selectedId = null;
+
+function selectNode(d) {
+  if (selectedId === d.id) { deselectNode(); return; }
+  selectedId = d.id;
+
+  nodeSel.classed('selected', n => n.id === d.id);
+
+  // Populate panel
+  document.getElementById('dp-name').textContent = d.label;
+  document.getElementById('dp-role').textContent = d.role;
+
+  const iconEl = document.getElementById('dp-icon');
+  iconEl.textContent = d.icon;
+  iconEl.style.background = (colorMap[d.category] || '#888').replace('var(', '').replace(')', '');
+  iconEl.style.background = colorMap[d.category];
+  iconEl.style.opacity = '0.25';
+  iconEl.style.background = 'transparent';
+  iconEl.style.border = `2px solid ${colorMap[d.category]}`;
+
+  // Badges
+  const badgesEl = document.getElementById('dp-badges');
+  badgesEl.innerHTML = '';
+  (d.status || []).forEach((s, i) => {
+    const b = document.createElement('span');
+    b.className = `badge ${d.statusClasses[i] || 'badge-location'}`;
+    b.textContent = s;
+    badgesEl.appendChild(b);
+  });
+
+  document.getElementById('dp-details').textContent = d.details;
+
+  // Connections
+  const connEl = document.getElementById('dp-connections');
+  connEl.innerHTML = '';
+  const conns = adjacency[d.id] || [];
+  const seen = new Set();
+  conns.forEach(c => {
+    const key = c.peer + c.rel;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const peer = nodes.find(n => n.id === c.peer);
+    if (!peer) return;
+    const li = document.createElement('li');
+    const dot = document.createElement('div');
+    dot.className = 'conn-dot';
+    dot.style.background = colorMap[peer.category] || '#888';
+    const text = document.createElement('div');
+    text.className = 'conn-text';
+    text.innerHTML = `<strong>${peer.label}</strong><br><span class="conn-rel">${c.dir} ${c.rel}</span>`;
+    li.appendChild(dot);
+    li.appendChild(text);
+    connEl.appendChild(li);
+  });
+
+  document.getElementById('detail-panel').classList.remove('hidden');
+}
+
+function deselectNode() {
+  selectedId = null;
+  nodeSel.classed('selected', false);
+  document.getElementById('detail-panel').classList.add('hidden');
+}
+
+document.getElementById('btn-close-panel').addEventListener('click', deselectNode);
+
+// ──────────────────────────────────────────────
+// LABELS TOGGLE
+// ──────────────────────────────────────────────
+let labelsVisible = true;
+document.getElementById('btn-labels').addEventListener('click', function() {
+  labelsVisible = !labelsVisible;
+  this.classList.toggle('active', labelsVisible);
+  svg.selectAll('.node-label, .node-sublabel, .link-label')
+    .style('display', labelsVisible ? null : 'none');
+});
+
+// ──────────────────────────────────────────────
+// RESIZE
+// ──────────────────────────────────────────────
+const ro = new ResizeObserver(() => {
+  W = container.clientWidth;
+  H = container.clientHeight;
+  sim.force('center', d3.forceCenter(W / 2, H / 2));
+  sim.force('x', d3.forceX(W / 2).strength(0.04));
+  sim.force('y', d3.forceY(H / 2).strength(0.04));
+  sim.alpha(0.2).restart();
+});
+ro.observe(container);
+
+// Initial warm-up
+sim.alpha(1).restart();
+</script>
+</body>
+</html>
