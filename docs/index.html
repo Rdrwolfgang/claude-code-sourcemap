@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Jarvis">
+  <title>⚡ Jarvis</title>
+  <style>
+    :root {
+      --bg: #08080f;
+      --surface: #11111c;
+      --border: #1c1c2e;
+      --accent: #6366f1;
+      --text: #ddddf0;
+      --muted: #5a5a7a;
+      --green: #22c55e;
+      --orange: #f59e0b;
+      --red: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      min-height: 100dvh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+    .logo em { color: var(--accent); font-style: normal; }
+
+    .subline {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 9px 15px;
+      transition: transform 0.1s, opacity 0.1s;
+      user-select: none;
+    }
+
+    button:active { transform: scale(0.95); opacity: 0.8; }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 17px; padding: 8px 12px; }
+
+    main { padding: 16px 18px 60px; max-width: 680px; margin: 0 auto; }
+
+    .loading, .error-msg {
+      text-align: center;
+      padding: 64px 20px;
+      color: var(--muted);
+    }
+
+    .spinner {
+      width: 26px; height: 26px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 10px 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2.5s ease infinite;
+    }
+
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.25; } }
+
+    .section { margin-bottom: 24px; }
+
+    .section-header {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2px;
+    }
+
+    .story {
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .story:last-child { border-bottom: none; }
+
+    .story-link {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.45;
+      color: var(--text);
+      text-decoration: none;
+      margin-bottom: 7px;
+    }
+
+    .story-link:active { color: var(--accent); }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      align-items: center;
+    }
+
+    .score { color: var(--orange); font-weight: 600; }
+
+    .tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: 11px;
+    }
+
+    .hint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .hint strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">⚡ <em>Jarvis</em></div>
+    <div class="subline" id="date-display"></div>
+  </div>
+  <div class="actions">
+    <button class="btn-secondary" onclick="load()" title="Refresh">↻</button>
+    <button class="btn-primary" onclick="shareToNotes()">Share to Notes</button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="loading">
+    <div class="spinner"></div>
+    Fetching today's briefing…
+  </div>
+</main>
+
+<script>
+  const CUTOFF_MS = 24 * 60 * 60 * 1000;
+  const CUTOFF = Date.now() - CUTOFF_MS;
+
+  const AI_KW = ['ai', 'llm', 'gpt', 'claude', 'gemini', 'openai', 'anthropic',
+    'deepmind', 'mistral', 'neural', 'model', 'transformer', 'diffusion',
+    'chatbot', 'agent', 'machine learning', 'deep learning', 'language model',
+    'inference', 'training data', 'fine-tun', 'benchmark', 'multimodal'];
+
+  const INDUSTRY_KW = ['startup', 'funding', 'raises', 'acquisition', 'ipo',
+    'valuation', 'microsoft', 'google', 'apple', 'meta', 'amazon', 'nvidia',
+    'semiconductor', 'chip', 'layoff', 'regulation', 'policy'];
+
+  const OSS_KW = ['open source', 'github', 'release', 'library', 'framework',
+    'sdk', 'developer', 'programming', 'rust', 'python', 'typescript', 'tool',
+    'plugin', 'extension', 'package', 'repo'];
+
+  function categorize(title) {
+    const t = title.toLowerCase();
+    if (AI_KW.some(k => t.includes(k))) return 'AI & Models';
+    if (INDUSTRY_KW.some(k => t.includes(k))) return 'Industry & Business';
+    if (OSS_KW.some(k => t.includes(k))) return 'Open Source & Tools';
+    return 'Tech';
+  }
+
+  function timeAgo(ts) {
+    const h = Math.floor((Date.now() - ts) / 3600000);
+    if (h < 1) return 'just now';
+    return h === 1 ? '1h ago' : `${h}h ago`;
+  }
+
+  async function fetchHN() {
+    const [t, n] = await Promise.all([
+      fetch('https://hacker-news.firebaseio.com/v0/topstories.json').then(r => r.json()),
+      fetch('https://hacker-news.firebaseio.com/v0/newstories.json').then(r => r.json()),
+    ]);
+    const ids = [...new Set([...t.slice(0, 60), ...n.slice(0, 30)])];
+    const items = await Promise.allSettled(
+      ids.map(id => fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json()))
+    );
+    return items
+      .filter(r => r.status === 'fulfilled' && r.value?.url && r.value.type === 'story')
+      .map(r => r.value)
+      .filter(x => x.time * 1000 > CUTOFF)
+      .map(x => ({ title: x.title, url: x.url, score: x.score || 0, source: 'HN', ts: x.time * 1000 }));
+  }
+
+  async function fetchReddit(sub) {
+    try {
+      const r = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=20`,
+        { headers: { Accept: 'application/json' } });
+      if (!r.ok) return [];
+      const d = await r.json();
+      return (d?.data?.children || []).map(c => c.data)
+        .filter(p => p && !p.is_self && p.url && p.created_utc * 1000 > CUTOFF && p.score > 40)
+        .map(p => ({
+          title: p.title,
+          url: p.url.startsWith('http') ? p.url : `https://reddit.com${p.permalink}`,
+          score: p.score,
+          source: `r/${sub}`,
+          ts: p.created_utc * 1000,
+        }));
+    } catch { return []; }
+  }
+
+  let _stories = [];
+
+  async function load() {
+    document.getElementById('main').innerHTML =
+      '<div class="loading"><div class="spinner"></div>Fetching today\'s briefing…</div>';
+
+    try {
+      const [hn, ...redd] = await Promise.allSettled([
+        fetchHN(),
+        fetchReddit('artificial'),
+        fetchReddit('MachineLearning'),
+        fetchReddit('LocalLLaMA'),
+        fetchReddit('singularity'),
+        fetchReddit('technology'),
+      ]);
+
+      const raw = [
+        ...(hn.status === 'fulfilled' ? hn.value : []),
+        ...redd.flatMap(r => r.status === 'fulfilled' ? r.value : []),
+      ];
+
+      const seen = new Set();
+      _stories = raw
+        .filter(s => {
+          const k = s.url.replace(/[?#].*$/, '').toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k); return true;
+        })
+        .sort((a, b) => {
+          const boost = s => s.ts > Date.now() - 6 * 3600000 ? s.score * 1.5 : s.score;
+          return boost(b) - boost(a);
+        })
+        .slice(0, 35);
+
+      render(_stories);
+    } catch (e) {
+      document.getElementById('main').innerHTML =
+        `<div class="error-msg">Could not load stories.<br><small>${e.message}</small></div>`;
+    }
+  }
+
+  const SECTION_ORDER = ['AI & Models', 'Industry & Business', 'Open Source & Tools', 'Tech'];
+
+  function render(stories) {
+    if (!stories.length) {
+      document.getElementById('main').innerHTML = '<div class="error-msg">No stories found.</div>';
+      return;
+    }
+
+    const groups = {};
+    for (const s of stories) {
+      const c = categorize(s.title);
+      (groups[c] ||= []).push(s);
+    }
+
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    let html = `
+      <div class="hint">
+        <strong>Add to home screen</strong> for one-tap access: tap the Share button in Safari → "Add to Home Screen"
+      </div>
+      <div class="status"><div class="dot"></div>${stories.length} stories · updated ${time}</div>`;
+
+    for (const cat of SECTION_ORDER) {
+      if (!groups[cat]?.length) continue;
+      html += `<div class="section"><div class="section-header">${cat}</div>`;
+      for (const s of groups[cat]) {
+        html += `<div class="story">
+          <a class="story-link" href="${s.url}" target="_blank" rel="noopener">${s.title}</a>
+          <div class="meta">
+            <span class="score">▲ ${s.score}</span>
+            <span>${timeAgo(s.ts)}</span>
+            <span class="tag">${s.source}</span>
+          </div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    document.getElementById('main').innerHTML = html;
+  }
+
+  function buildPlainText() {
+    const date = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+    });
+    let out = `⚡ JARVIS DAILY BRIEFING\n${date}\n${'─'.repeat(36)}\n\n`;
+
+    const groups = {};
+    for (const s of _stories) (groups[categorize(s.title)] ||= []).push(s);
+
+    for (const cat of SECTION_ORDER) {
+      if (!groups[cat]?.length) continue;
+      out += `── ${cat.toUpperCase()} ──\n\n`;
+      for (const s of groups[cat]) {
+        out += `• ${s.title}\n  ${s.url}\n  ▲${s.score} · ${timeAgo(s.ts)} · ${s.source}\n\n`;
+      }
+    }
+    return out.trim();
+  }
+
+  async function shareToNotes() {
+    if (!_stories.length) { alert('Still loading — try again in a moment.'); return; }
+    const text = buildPlainText();
+    if (navigator.share) {
+      try { await navigator.share({ title: '⚡ Jarvis Daily Briefing', text }); return; } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Copied to clipboard — paste into Notes.');
+    } catch {
+      alert('Copy the text from the page manually.');
+    }
+  }
+
+  // Set date in header
+  document.getElementById('date-display').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+
+  load();
+</script>
+</body>
+</html>
