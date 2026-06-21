@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Judge {
+  id              String   @id @default(cuid())
+  name            String
+  division        String
+  court           String   // "Criminal Court", "Circuit Court", "General Sessions"
+  appointedDate   DateTime?
+  party           String?  // "D", "R", "I"
+  isActive        Boolean  @default(true)
+  bio             String?
+  imageUrl        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  cases           Case[]   @relation("PresidingJudge")
+
+  @@index([court])
+  @@index([name])
+}
+
+model Defendant {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  middleName      String?
+  dob             DateTime?
+  race            String?
+  sex             String?
+  address         String?
+  city            String?
+  state           String   @default("TN")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  cases           CaseDefendant[]
+
+  @@index([lastName, firstName])
+}
+
+model Case {
+  id              String   @id @default(cuid())
+  caseNumber      String   @unique
+  court           String
+  county          String   @default("Shelby")
+  state           String   @default("TN")
+  filedDate       DateTime?
+  dispositionDate DateTime?
+  status          String   // "Open", "Closed", "Pending", "Appealed"
+
+  judgeId         String?
+  judge           Judge?   @relation("PresidingJudge", fields: [judgeId], references: [id])
+
+  prosecutorName  String?  // DA or ADA name
+  daOffice        String?
+
+  isHighProfile   Boolean  @default(false)
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  defendants      CaseDefendant[]
+  charges         Charge[]
+  hearings        Hearing[]
+
+  @@index([caseNumber])
+  @@index([judgeId])
+  @@index([court])
+  @@index([filedDate])
+}
+
+model CaseDefendant {
+  id            String    @id @default(cuid())
+  caseId        String
+  defendantId   String
+  role          String    @default("Defendant")
+
+  case          Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  defendant     Defendant @relation(fields: [defendantId], references: [id])
+
+  @@unique([caseId, defendantId])
+  @@index([caseId])
+  @@index([defendantId])
+}
+
+model Charge {
+  id              String   @id @default(cuid())
+  caseId          String
+  statute         String?
+  description     String
+  severity        String   // "Felony A", "Felony B", "Felony C", "Misdemeanor", "Violation"
+  isViolent       Boolean  @default(false)
+  isDrugRelated   Boolean  @default(false)
+  disposition     String?  // "Guilty", "Not Guilty", "Nolle Pros", "Dismissed", "Diversion", "Guilty Plea"
+  sentence        String?
+  bondAmount      Float?
+  bondType        String?  // "Cash", "Surety", "OR", "Held Without Bond"
+
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([severity])
+  @@index([disposition])
+}
+
+model Hearing {
+  id          String   @id @default(cuid())
+  caseId      String
+  hearingDate DateTime
+  hearingType String   // "Arraignment", "Bail", "Preliminary", "Trial", "Sentencing", "Revocation"
+  outcome     String?
+  notes       String?
+
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([hearingDate])
+}
+
+model WatchlistItem {
+  id            String   @id @default(cuid())
+  userEmail     String
+  itemType      String   // "defendant", "judge", "case"
+  itemId        String
+  createdAt     DateTime @default(now())
+
+  @@unique([userEmail, itemType, itemId])
+  @@index([userEmail])
+}
+
+model DataSource {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  description String?
+  isActive    Boolean  @default(true)
+  lastChecked DateTime?
+  createdAt   DateTime @default(now())
+}

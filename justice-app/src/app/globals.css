@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 15 23 42;
+    --foreground: 226 232 240;
+    --card: 30 41 59;
+    --card-foreground: 226 232 240;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --primary: 59 130 246;
+    --primary-foreground: 255 255 255;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184;
+    --accent: 30 58 138;
+    --destructive: 220 38 38;
+    --ring: 59 130 246;
+  }
+}
+
+body {
+  background-color: rgb(15 23 42);
+  color: rgb(226 232 240);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: rgb(30 41 59); }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(71 85 105); border-radius: 3px; }
+
+.chart-tooltip {
+  background: rgb(30 41 59) !important;
+  border: 1px solid rgb(51 65 85) !important;
+  border-radius: 8px !important;
+  color: rgb(226 232 240) !important;
+}
