@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vexilla">
+<title>🏴 Vexilla — a flag-design game</title>
+<style>
+  :root{
+    --chrome:#1a1a20; --chrome2:#222229; --panel:#26262f; --line:#33333d;
+    --ink:#e9e8f0; --muted:#8a8a9a; --accent:#e8b64c; --accent2:#5b8fd6;
+    --table:#2e2a26; --danger:#e0654f; --good:#5cb37a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;}
+  html,body{height:100%; overscroll-behavior:none; overflow:hidden; touch-action:none; background:var(--chrome); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;}
+  button{font:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+  input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:20px; background:transparent;}
+  input[type=range]::-webkit-slider-runnable-track{height:4px; background:var(--line); border-radius:2px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--accent); margin-top:-6px;}
+  textarea{font:inherit; color:var(--ink); background:var(--chrome2); border:1px solid var(--line); border-radius:8px; padding:10px; width:100%; resize:none; -webkit-user-select:text; user-select:text;}
+
+  .app{display:grid; grid-template-columns:190px 1fr 236px; grid-template-rows:auto 1fr; height:100dvh; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  header{grid-column:1/4; display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--chrome2); border-bottom:1px solid var(--line);}
+  .brand{font-weight:800; letter-spacing:-.3px; font-size:15px; color:var(--accent); white-space:nowrap;}
+  .subject-btn{flex:1; text-align:left; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 12px; min-width:0;}
+  .subject-btn .name{font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .subject-btn .type{font-size:11px; color:var(--muted);}
+  .hbtn{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 14px; font-size:13px; font-weight:600; white-space:nowrap;}
+  .hbtn.primary{background:var(--accent); color:#1a1a20; border-color:var(--accent);}
+
+  aside{background:var(--chrome2); border-right:1px solid var(--line); overflow-y:auto; touch-action:pan-y; padding:10px;}
+  aside.right{border-right:none; border-left:1px solid var(--line);}
+  .rail-title{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:10px 4px 6px;}
+  .rail-title:first-child{margin-top:2px;}
+
+  main.stage{position:relative; background:radial-gradient(ellipse at 50% 35%, #3a352f, var(--table)); display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .canvas-wrap{position:relative; width:min(84vw,120vh); aspect-ratio:3/2; box-shadow:0 20px 50px rgba(0,0,0,.55); border-radius:4px; touch-action:none;}
+  .canvas-wrap::before{content:""; position:absolute; left:-14px; top:-10px; bottom:-10px; width:8px; background:linear-gradient(180deg,#8a8a8a,#4a4a4a); border-radius:4px;}
+  canvas#flagCanvas{position:absolute; inset:0; width:100%; height:100%; display:block; background:#fff; touch-action:none; -webkit-touch-callout:none; border-radius:2px; cursor:none;}
+  #ghost{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
+  #pencilDot{position:absolute; pointer-events:none; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:rgba(0,0,0,.18); opacity:0; transition:opacity .1s;}
+
+  .hud{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:14px; align-items:center;
+    background:rgba(20,20,26,.72); backdrop-filter:blur(10px); border:1px solid var(--line); border-radius:12px; padding:8px 14px; font-size:11px; color:var(--muted);}
+  .hud .metric{display:flex; align-items:center; gap:6px;}
+  .hud .bar{width:46px; height:5px; background:var(--line); border-radius:3px; overflow:hidden;}
+  .hud .bar i{display:block; height:100%; width:0%; background:var(--accent2);}
+  .hud .tiltdot{width:20px; height:20px; border-radius:50%; border:1px solid var(--line); position:relative;}
+  .hud .tiltdot b{position:absolute; width:5px; height:5px; border-radius:50%; background:var(--accent); top:50%; left:50%; margin:-2.5px 0 0 -2.5px;}
+  .hud .compass{width:20px; height:20px; border-radius:50%; border:1px solid var(--line); position:relative;}
+  .hud .compass i{position:absolute; left:50%; top:50%; width:1.5px; height:8px; background:var(--accent); transform-origin:50% 0;}
+
+  .swatches{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+  .swatch{width:100%; aspect-ratio:1; border-radius:8px; border:2px solid transparent;}
+  .swatch.active{border-color:var(--accent);}
+  .swatch.white{border:1px solid var(--line);}
+
+  .fieldgen{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  .fieldgen button{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 4px; font-size:10.5px; line-height:1.2;}
+  .fieldgen button:active{background:var(--line);}
+
+  .layer{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:8px;}
+  .layer.active{border-color:var(--accent2);}
+  .layer .row1{display:flex; align-items:center; gap:6px; margin-bottom:6px;}
+  .layer .row1 button{font-size:14px; width:22px; text-align:center;}
+  .layer .name{flex:1; font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .layer .row2{display:flex; align-items:center; gap:4px;}
+  .layer input[type=range]{flex:1;}
+  .addlayer{width:100%; background:var(--panel); border:1px dashed var(--line); border-radius:10px; padding:8px; font-size:12px; color:var(--muted); margin-bottom:10px;}
+
+  .tools{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px;}
+  .tool{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 4px; text-align:center; font-size:11px;}
+  .tool .ic{font-size:18px; display:block; margin-bottom:3px;}
+  .tool.active{background:var(--accent2); border-color:var(--accent2); color:#0d1420;}
+
+  .symtabs{display:flex; gap:4px; margin-bottom:6px;}
+  .symtabs button{flex:1; font-size:10.5px; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:5px 2px;}
+  .symtabs button.active{background:var(--accent); color:#1a1a20; border-color:var(--accent);}
+  .symgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:10px;}
+  .symgrid button{background:var(--panel); border:1px solid var(--line); border-radius:8px; aspect-ratio:1; display:flex; align-items:center; justify-content:center;}
+  .symgrid button.active{border-color:var(--accent);}
+  .symgrid canvas{width:70%; height:70%;}
+
+  .squeezepad{width:100%; background:linear-gradient(180deg,var(--accent2),#3f6ba8); border-radius:12px; padding:12px; text-align:center; font-size:12px; font-weight:700; color:#0d1420; margin-top:4px;}
+  .squeezepad small{display:block; font-weight:500; opacity:.8; font-size:10px; margin-top:2px;}
+
+  .undoredo{display:flex; gap:8px; margin-top:8px;}
+  .undoredo button{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px;}
+
+  /* radial squeeze menu */
+  #radial{position:fixed; width:190px; height:190px; margin:-95px 0 0 -95px; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .12s, transform .12s; transform:scale(.7); z-index:50;}
+  #radial.open{opacity:1; pointer-events:auto; transform:scale(1);}
+  #radial .hub{position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:50%; background:rgba(20,20,26,.9); border:1px solid var(--line);}
+  #radial .opt{position:absolute; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; background:var(--panel); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px;}
+  #radial .opt.hot{background:var(--accent2); border-color:#fff;}
+
+  .toast{position:fixed; left:50%; top:16px; transform:translateX(-50%) translateY(-10px); background:rgba(20,20,26,.92); border:1px solid var(--line); padding:10px 16px; border-radius:10px; font-size:13px; opacity:0; transition:opacity .2s, transform .2s; z-index:80; max-width:80vw; text-align:center;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .drawer{position:fixed; inset:0; background:rgba(10,10,14,.6); display:flex; align-items:flex-start; justify-content:center; padding-top:6vh; z-index:60; opacity:0; pointer-events:none; transition:opacity .18s;}
+  .drawer.open{opacity:1; pointer-events:auto;}
+  .drawer .card{background:var(--chrome2); border:1px solid var(--line); border-radius:16px; width:min(560px,92vw); max-height:86vh; overflow-y:auto; touch-action:pan-y; padding:22px;}
+  .drawer h2{font-size:19px; margin-bottom:4px;}
+  .drawer .kind{color:var(--accent); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:14px;}
+  .drawer .block{margin-bottom:14px;}
+  .drawer .block b{display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;}
+  .drawer .block p{font-size:14.5px; line-height:1.5;}
+  .drawer .closebtn{margin-top:8px;}
+
+  .checklist{display:flex; flex-direction:column; gap:10px; margin:14px 0;}
+  .citem{display:flex; gap:10px; background:var(--chrome); border:1px solid var(--line); border-radius:10px; padding:10px 12px;}
+  .citem .mark{font-size:16px; width:20px; flex-shrink:0;}
+  .citem .txt b{display:block; font-size:13px;}
+  .citem .txt span{font-size:12px; color:var(--muted);}
+  .grade{text-align:center; padding:16px; border-radius:14px; background:linear-gradient(180deg,var(--accent),#c99530); color:#1a1a20; margin-bottom:14px;}
+  .grade .score{font-size:30px; font-weight:800;}
+  .grade .label{font-size:14px; font-weight:700; margin-top:2px;}
+
+  .devtoggle{position:fixed; right:8px; bottom:8px; z-index:70; font-size:10px; color:var(--muted); background:rgba(20,20,26,.7); border:1px solid var(--line); border-radius:8px; padding:5px 8px; display:flex; align-items:center; gap:5px;}
+  .devtoggle input{width:13px; height:13px;}
+
+  @media (max-aspect-ratio: 4/5){
+    .app{grid-template-columns:1fr; grid-template-rows:auto auto 1fr auto;}
+    aside{border:none; border-bottom:1px solid var(--line); display:flex; gap:8px; overflow-x:auto; touch-action:pan-x; white-space:nowrap; padding:8px;}
+    aside.right{border-bottom:none; border-top:1px solid var(--line);}
+    .rail-title{display:none;}
+    aside > *{flex-shrink:0; width:150px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">🏴 VEXILLA</div>
+    <button class="subject-btn" id="subjectBtn">
+      <div class="name" id="subjectName">—</div>
+      <div class="type" id="subjectType">Loading a people to serve…</div>
+    </button>
+    <button class="hbtn" id="newSubjectBtn">🎲 New Subject</button>
+    <button class="hbtn primary" id="presentBtn">🏁 Present Flag</button>
+  </header>
+
+  <aside class="left">
+    <div class="rail-title">Field & Construction</div>
+    <div class="fieldgen" id="fieldGen"></div>
+
+    <div class="rail-title">Ink Colors</div>
+    <div class="swatches" id="swatches"></div>
+
+    <div class="rail-title">Layers</div>
+    <div id="layerList"></div>
+    <button class="addlayer" id="addLayerBtn">+ Add Layer</button>
+  </aside>
+
+  <main class="stage">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="flagCanvas" width="1200" height="800"></canvas>
+      <canvas id="ghost" width="1200" height="800"></canvas>
+      <div id="pencilDot"></div>
+    </div>
+    <div class="hud">
+      <div class="metric">✏️ pressure <div class="bar"><i id="hudPressure"></i></div></div>
+      <div class="metric">⟳ tilt <div class="tiltdot"><b id="hudTilt"></b></div></div>
+      <div class="metric">🧭 barrel <div class="compass"><i id="hudAzimuth"></i></div></div>
+    </div>
+  </main>
+
+  <aside class="right">
+    <div class="rail-title">Tools <span style="float:right; cursor:pointer;" id="howToBtn">ⓘ how-to</span></div>
+    <div class="tools" id="toolTray"></div>
+    <button class="squeezepad" id="squeezePad">🤏 SQUEEZE<small>tap-hold, or squeeze hard mid-stroke</small></button>
+    <div class="undoredo">
+      <button id="undoBtn">↩︎ Undo</button>
+      <button id="clearBtn">🗑 Clear Layer</button>
+    </div>
+
+    <div class="rail-title">Symbol Library</div>
+    <div class="symtabs" id="symTabs"></div>
+    <div class="symgrid" id="symGrid"></div>
+  </aside>
+</div>
+
+<div id="radial">
+  <div class="hub"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="drawer" id="subjectDrawer">
+  <div class="card">
+    <div class="kind" id="drKind">City-State</div>
+    <h2 id="drName">—</h2>
+    <div class="block"><b>Condition</b><p id="drCondition"></p></div>
+    <div class="block"><b>Aspiration</b><p id="drAspiration"></p></div>
+    <div class="block"><b>Epistemology — how they know what's true</b><p id="drEpistemology"></p></div>
+    <button class="hbtn primary closebtn" id="drClose">Design their flag →</button>
+  </div>
+</div>
+
+<div class="drawer" id="howToDrawer">
+  <div class="card">
+    <div class="kind">How to Play</div>
+    <h2>Design with an Apple Pencil Pro</h2>
+    <div class="block"><b>Pencil only</b><p>The canvas only accepts marks from an actual pencil — fingers and mice are refused so nothing gets a "hand mark." Field patterns, layers, colors and the tray are normal touch UI.</p></div>
+    <div class="block"><b>Pressure</b><p>Push harder for a bolder, more opaque stroke — lighter for a thin, faint line.</p></div>
+    <div class="block"><b>Tilt</b><p>Lay the pencil over and your stroke gains a shaded, graphite-like edge — like shading with the side of a lead.</p></div>
+    <div class="block"><b>Barrel roll (azimuth)</b><p>Hover the Stamp tool and roll the pencil in your fingers — the symbol preview spins live to match. Lift to commit it at that angle.</p></div>
+    <div class="block"><b>Squeeze</b><p>Real Pencil Pro squeeze isn't opened up to web pages yet, so it's emulated: press suddenly and sharply mid-stroke to pop the radial tool picker at your tip. The <em>Squeeze Pad</em> button always works too, as a guaranteed fallback.</p></div>
+    <button class="hbtn primary closebtn" id="htClose">Got it</button>
+  </div>
+</div>
+
+<div class="drawer" id="presentDrawer">
+  <div class="card">
+    <div class="kind">The Flag Is Presented</div>
+    <h2 id="prName">—</h2>
+    <div class="grade" id="prGrade"><div class="score" id="prScore">0/5</div><div class="label" id="prLabel">—</div></div>
+    <div class="checklist" id="prChecklist"></div>
+    <div class="block"><b>What does it mean? (optional, for you)</b>
+      <textarea id="prMeaning" rows="3" placeholder="How does this flag speak to their condition, aspiration, or epistemology?"></textarea>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button class="hbtn" id="prSave">⬇︎ Save PNG</button>
+      <button class="hbtn primary" id="prNew" style="flex:1;">🎲 New Subject</button>
+    </div>
+    <button class="hbtn closebtn" id="prClose" style="margin-top:8px; width:100%;">Keep Editing</button>
+  </div>
+</div>
+
+<label class="devtoggle"><input type="checkbox" id="devMode"> dev: allow finger/mouse (testing off-iPad)</label>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- subject generator ---------- */
+const POLITIES = ["Republic","Clan","Tribe","City-State","Free Village","Confederation","Order","Hold","Commune","Reach"];
+const SYL = ["Ver","Ash","Kel","Or","Thal","Sur","Mor","Isk","Dun","Bel","Rha","Nym","Cael","Ost","Fenn","Ilyr","Sae","Tor","Wyn","Ghal"];
+const SUF = ["en","ar","oth","ic","um","esh","ir","ond","ai","ka"];
+const CONDITIONS = [
+ "Three generations ago the sea swallowed their lowlands; they now build on stilts and count wealth in salvaged timber.",
+ "A century of drought broke their old kingship; water-rights councils now rule in its place.",
+ "They won a war they can no longer explain the cause of, and inherited a border no neighbor recognizes.",
+ "Plague halved them twice in one lifetime; every surviving family adopted at least one orphaned line.",
+ "They mine a mountain that is slowly hollowing out beneath them, and everyone knows it.",
+ "Refugees from a drowned empire, they arrived with nothing but seed-grain and grief.",
+ "A volcano gives them rich soil and takes a village every few generations; they've stopped naming the ones nearest the rim.",
+ "They broke from a larger republic over a tax on salt, and have taxed nothing since.",
+ "Their harbor silted shut a lifetime ago; they became a road instead of a port.",
+ "They were the losing side of a war fought by people who no longer exist.",
+ "A single bad harvest scattered a third of them across the sea; the letters home never stopped coming.",
+ "They inherited a fortress built to keep an enemy out that vanished before it was finished.",
+ "Two rival bloodlines married rather than fight a third time, and never quite forgave each other for it.",
+ "They dug their capital underground during a war and simply never came back up.",
+ "A prophecy about their ruin turned out to be about someone else's city; they've never fully recovered the certainty they lost."
+];
+const ASPIRATIONS = [
+ "to be forgotten by every army that ever finds the pass",
+ "to out-build the empire that once enslaved them",
+ "to hold the strait long enough for their children to forget why it mattered",
+ "to never again need a wall",
+ "to become the harbor every drowned fleet was searching for",
+ "to owe no one a debt that outlives the debtor",
+ "to grow enough grain that hunger becomes a word for a season, not a fear",
+ "to be governed by no one who has not first buried someone here",
+ "to make their dialect worth learning by outsiders",
+ "to be the last thing standing when the mountain finally finishes hollowing",
+ "to trade with everyone and kneel to no one",
+ "to raise a generation that has never had to run",
+ "to be small enough that no one bothers conquering them again",
+ "to write their own law before someone else's is written over them",
+ "to be remembered as builders, not as the ones who were built upon"
+];
+const EPISTEMOLOGIES = [
+ "Truth is whatever the eldest living witness still swears to.",
+ "Truth is measured, never spoken — a thing is true if it can be weighed.",
+ "Truth is what survives translation through all seven dialects.",
+ "Truth is written only in stone; paper is for opinions.",
+ "Truth is decided by lot, on the theory that chance is less corrupt than memory.",
+ "Truth is whatever the tide has not yet erased.",
+ "Truth is a debt — you owe your account to the person it happened to, not to a court.",
+ "Truth is what the youngest child in the room says before anyone coaches them.",
+ "Truth is a vote taken three times, on three different days, and only trusted if it doesn't change.",
+ "Truth is buried with the dead and dug up again only in emergencies.",
+ "Truth is whatever can be repeated identically by two people who never spoke to each other.",
+ "Truth is a debt paid in public; a private confession changes nothing.",
+ "Truth is what the loom shows — they read pattern, not testimony.",
+ "Truth is what still holds after a year of arguing about it.",
+ "Truth is a wound — you trust the story that cost the teller something."
+];
+
+function genName(){
+  const parts = 2 + (Math.random()<0.4?1:0);
+  let n = "";
+  for(let i=0;i<parts;i++) n += SYL[Math.floor(Math.random()*SYL.length)].toLowerCase();
+  n = n[0].toUpperCase()+n.slice(1);
+  if(Math.random()<0.65) n += "-" + SUF[Math.floor(Math.random()*SUF.length)];
+  return n;
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+let subject = null;
+function newSubject(){
+  subject = {
+    polity: pick(POLITIES),
+    name: genName(),
+    condition: pick(CONDITIONS),
+    aspiration: pick(ASPIRATIONS),
+    epistemology: pick(EPISTEMOLOGIES)
+  };
+  $("#subjectName").textContent = "The " + subject.polity + " of " + subject.name;
+  $("#subjectType").textContent = "tap for their story";
+  $("#drKind").textContent = subject.polity;
+  $("#drName").textContent = "The " + subject.polity + " of " + subject.name;
+  $("#drCondition").textContent = subject.condition;
+  $("#drAspiration").textContent = "They aspire " + subject.aspiration + ".";
+  $("#drEpistemology").textContent = subject.epistemology;
+}
+
+/* ---------- small dom helper ---------- */
+function $(sel){ return document.querySelector(sel); }
+function el(tag, cls){ const e=document.createElement(tag); if(cls) e.className=cls; return e; }
+
+/* ---------- palette ---------- */
+const PALETTE = ["#FFFFFF","#111111","#C81E2C","#1B3A6B","#F2C230","#1E7A46","#5B2A6E","#E06B1F","#6B3A22","#3FA7C9","#0E7C74","#7A1F3D"];
+let currentColor = PALETTE[2];
+
+/* ---------- canvas / layer engine ---------- */
+const W = 1200, H = 800;
+const visible = $("#flagCanvas");
+const vctx = visible.getContext("2d");
+const ghostCanvas = $("#ghost");
+const gctx = ghostCanvas.getContext("2d");
+
+let layers = [];
+let activeLayer = 0;
+let symbolsPlaced = 0;
+
+function makeLayer(name, opts){
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const layer = Object.assign({
+    id: Math.random().toString(36).slice(2),
+    name, canvas:c, ctx:c.getContext("2d"),
+    visible:true, opacity:1, locked:false, hasContent:false,
+    undoStack:[]
+  }, opts||{});
+  return layer;
+}
+
+function initLayers(){
+  layers = [];
+  const field = makeLayer("Field");
+  field.ctx.fillStyle = "#FFFFFF";
+  field.ctx.fillRect(0,0,W,H);
+  field.hasContent = true;
+  layers.push(field);
+  const ink = makeLayer("Ink 1");
+  layers.push(ink);
+  activeLayer = 1;
+  symbolsPlaced = 0;
+  renderLayerList();
+  renderComposite();
+}
+
+function renderComposite(){
+  vctx.clearRect(0,0,W,H);
+  for(const l of layers){
+    if(!l.visible) continue;
+    vctx.globalAlpha = l.opacity;
+    vctx.globalCompositeOperation = "source-over";
+    vctx.drawImage(l.canvas, 0, 0);
+  }
+  vctx.globalAlpha = 1;
+}
+
+function pushUndo(layer){
+  const snap = layer.ctx.getImageData(0,0,W,H);
+  layer.undoStack.push(snap);
+  if(layer.undoStack.length > 12) layer.undoStack.shift();
+}
+function undo(){
+  const l = layers[activeLayer];
+  if(!l || l.undoStack.length===0){ toast("Nothing to undo on this layer."); return; }
+  const snap = l.undoStack.pop();
+  l.ctx.putImageData(snap,0,0);
+  renderComposite();
+}
+
+/* ---------- layer panel UI ---------- */
+function renderLayerList(){
+  const list = $("#layerList");
+  list.innerHTML = "";
+  for(let i=layers.length-1;i>=0;i--){
+    const l = layers[i];
+    const row = el("div","layer"+(i===activeLayer?" active":""));
+    const row1 = el("div","row1");
+
+    const vis = el("button"); vis.textContent = l.visible?"👁":"🚫";
+    vis.onclick = (e)=>{ e.stopPropagation(); l.visible=!l.visible; renderComposite(); renderLayerList(); };
+
+    const name = el("div","name"); name.textContent = l.name + (i===0?" (base)":"");
+
+    const lock = el("button"); lock.textContent = l.locked?"🔒":"🔓";
+    lock.onclick = (e)=>{ e.stopPropagation(); l.locked=!l.locked; renderLayerList(); };
+
+    row1.append(vis,name,lock);
+    row.appendChild(row1);
+
+    if(i!==0){
+      const row2 = el("div","row2");
+      const op = document.createElement("input");
+      op.type="range"; op.min=0; op.max=1; op.step=0.05; op.value=l.opacity;
+      op.oninput = ()=>{ l.opacity=parseFloat(op.value); renderComposite(); };
+      const del = el("button"); del.textContent="🗑"; del.style.fontSize="12px";
+      del.onclick=(e)=>{ e.stopPropagation();
+        if(layers.length<=2){ toast("Keep at least one ink layer."); return; }
+        layers.splice(i,1);
+        if(activeLayer>=layers.length) activeLayer=layers.length-1;
+        renderComposite(); renderLayerList();
+      };
+      row2.append(op,del);
+      row.appendChild(row2);
+    }
+
+    row.onclick = ()=>{ activeLayer=i; renderLayerList(); };
+    list.appendChild(row);
+  }
+}
+$("#addLayerBtn").onclick = ()=>{
+  if(layers.length>=7){ toast("Six ink layers is plenty for a flag."); return; }
+  const l = makeLayer("Ink "+layers.length);
+  layers.push(l);
+  activeLayer = layers.length-1;
+  renderLayerList();
+};
+$("#clearBtn").onclick = ()=>{
+  const l = layers[activeLayer];
+  if(l.locked){ toast("That layer is locked."); return; }
+  if(activeLayer===0){ toast("The base field can be reset from Field & Construction."); return; }
+  pushUndo(l);
+  l.ctx.clearRect(0,0,W,H);
+  l.hasContent=false;
+  renderComposite();
+};
+$("#undoBtn").onclick = undo;
+
+/* ---------- swatches ---------- */
+(function buildSwatches(){
+  const wrap = $("#swatches");
+  PALETTE.forEach((c,i)=>{
+    const b = el("button","swatch"+(c==="#FFFFFF"?" white":""));
+    b.style.background = c;
+    if(c===currentColor) b.classList.add("active");
+    b.onclick = ()=>{
+      currentColor = c;
+      [...wrap.children].forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+    };
+    wrap.appendChild(b);
+  });
+})();
+
+/* ---------- field / construction generators ---------- */
+function fieldCtx(){ return layers[0].ctx; }
+const FIELD_ACTIONS = [
+  ["Solid", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); c.fillStyle=currentColor; c.fillRect(0,0,W,H); }],
+  ["Bicolor split", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); c.fillStyle="#FFFFFF"; c.fillRect(0,0,W,H);
+      c.fillStyle=currentColor; c.fillRect(0,0,W,H/2); }],
+  ["Vertical triband", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); const w=W/3;
+      c.fillStyle=currentColor; c.fillRect(0,0,w,H);
+      c.fillStyle="#FFFFFF"; c.fillRect(w,0,w,H);
+      c.fillStyle=currentColor; c.fillRect(2*w,0,w,H); }],
+  ["Horizontal triband", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); const h=H/3;
+      c.fillStyle=currentColor; c.fillRect(0,0,W,h);
+      c.fillStyle="#FFFFFF"; c.fillRect(0,h,W,h);
+      c.fillStyle=currentColor; c.fillRect(0,2*h,W,h); }],
+  ["Canton", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); c.fillStyle="#FFFFFF"; c.fillRect(0,0,W,H);
+      c.fillStyle=currentColor; c.fillRect(0,0,W*0.42,H*0.55); }],
+  ["Nordic cross", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); c.fillStyle="#FFFFFF"; c.fillRect(0,0,W,H);
+      c.fillStyle=currentColor;
+      c.fillRect(W*0.32,0,W*0.14,H);
+      c.fillRect(0,H*0.42,W,H*0.16); }],
+  ["Saltire", ()=>{ const c=fieldCtx(); c.clearRect(0,0,W,H); c.fillStyle="#FFFFFF"; c.fillRect(0,0,W,H);
+      c.strokeStyle=currentColor; c.lineWidth=H*0.16; c.lineCap="butt";
+      c.beginPath(); c.moveTo(0,0); c.lineTo(W,H); c.stroke();
+      c.beginPath(); c.moveTo(W,0); c.lineTo(0,H); c.stroke(); }],
+  ["Border", ()=>{ const c=fieldCtx(); const b=H*0.1; c.clearRect(0,0,W,H);
+      c.fillStyle=currentColor; c.fillRect(0,0,W,H);
+      c.fillStyle="#FFFFFF"; c.fillRect(b,b,W-2*b,H-2*b); }]
+];
+(function buildFieldGen(){
+  const wrap = $("#fieldGen");
+  FIELD_ACTIONS.forEach(([label,fn])=>{
+    const b = el("button"); b.textContent = label;
+    b.onclick = ()=>{ pushUndo(layers[0]); fn(); layers[0].hasContent=true; renderComposite(); };
+    wrap.appendChild(b);
+  });
+})();
+
+/* ---------- symbol library (drawn as vector paths, not raster) ---------- */
+function drawSun(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=6;
+  c.beginPath(); c.arc(0,0,16,0,Math.PI*2); c.fill();
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; c.beginPath(); c.moveTo(Math.cos(a)*22,Math.sin(a)*22); c.lineTo(Math.cos(a)*38,Math.sin(a)*38); c.stroke(); }
+}
+function drawTree(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=6;
+  c.beginPath(); c.moveTo(0,10); c.lineTo(0,40); c.stroke();
+  c.beginPath(); c.arc(0,-8,26,0,Math.PI*2); c.fill();
+}
+function drawMountain(c,col){ c.fillStyle=col; c.strokeStyle=col; c.lineWidth=5;
+  c.beginPath(); c.moveTo(-40,30); c.lineTo(-10,-25); c.lineTo(10,0); c.lineTo(25,-35); c.lineTo(45,30); c.closePath(); c.fill();
+}
+function drawWave(c,col){ c.strokeStyle=col; c.lineWidth=7; c.lineCap="round"; c.fillStyle="none";
+  for(let row=-1;row<=1;row++){ c.beginPath();
+    for(let x=-40;x<=40;x+=4){ const y=row*20+Math.sin((x+ (row*10))/10)*10; if(x===-40) c.moveTo(x,y); else c.lineTo(x,y); }
+    c.stroke(); }
+}
+function drawEye(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=5;
+  c.beginPath(); c.moveTo(-40,0); c.quadraticCurveTo(0,-28,40,0); c.quadraticCurveTo(0,28,-40,0); c.stroke();
+  c.beginPath(); c.arc(0,0,11,0,Math.PI*2); c.fill();
+}
+function drawFlame(c,col){ c.fillStyle=col;
+  c.beginPath(); c.moveTo(0,-38); c.quadraticCurveTo(24,-6,10,20); c.quadraticCurveTo(20,10,14,-2);
+  c.quadraticCurveTo(10,30,-8,32); c.quadraticCurveTo(-26,20,-14,-4); c.quadraticCurveTo(-20,-2,-16,-16);
+  c.quadraticCurveTo(-6,-24,0,-38); c.closePath(); c.fill();
+}
+function drawStar(c,col){ c.fillStyle=col; const spikes=5, outer=34, inner=14; let rot=Math.PI/2*3;
+  c.beginPath(); c.moveTo(0,-outer);
+  for(let i=0;i<spikes;i++){ c.lineTo(Math.cos(rot)*outer,Math.sin(rot)*outer); rot+=Math.PI/spikes;
+    c.lineTo(Math.cos(rot)*inner,Math.sin(rot)*inner); rot+=Math.PI/spikes; }
+  c.closePath(); c.fill();
+}
+function drawCrescent(c,col){ c.fillStyle=col; c.beginPath(); c.arc(0,0,30,0,Math.PI*2);
+  c.moveTo(14,-30); c.arc(14,0,30,-Math.PI/1.7,Math.PI/1.7,true); c.fill("evenodd");
+}
+function drawChevron(c,col){ c.strokeStyle=col; c.lineWidth=10; c.lineJoin="miter"; c.lineCap="butt";
+  c.beginPath(); c.moveTo(-38,30); c.lineTo(0,-25); c.lineTo(38,30); c.stroke();
+}
+function drawCross(c,col){ c.fillStyle=col;
+  c.fillRect(-9,-38,18,76); c.fillRect(-38,-9,76,18);
+}
+function drawLaurel(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=3;
+  for(let side=-1;side<=1;side+=2){ for(let i=0;i<5;i++){ const y=-30+i*15; c.save(); c.translate(side*10,y); c.rotate(side*0.6);
+      c.beginPath(); c.ellipse(0,0,10,4,0,0,Math.PI*2); c.fill(); c.restore(); } }
+}
+function drawAnchor(c,col){ c.strokeStyle=col; c.lineWidth=6; c.lineCap="round"; c.fillStyle="none";
+  c.beginPath(); c.arc(0,-24,8,0,Math.PI*2); c.stroke();
+  c.beginPath(); c.moveTo(0,-16); c.lineTo(0,32); c.stroke();
+  c.beginPath(); c.moveTo(-22,6); c.lineTo(22,6); c.stroke();
+  c.beginPath(); c.moveTo(-24,16); c.quadraticCurveTo(-24,34,0,34); c.quadraticCurveTo(24,34,24,16); c.stroke();
+}
+function drawRuneBolt(c,col){ c.strokeStyle=col; c.lineWidth=7; c.lineJoin="round"; c.lineCap="round"; c.fillStyle="none";
+  c.beginPath(); c.moveTo(-30,-38); c.lineTo(-38,38); c.lineTo(38,-38); c.lineTo(30,38); c.stroke();
+  c.beginPath(); c.moveTo(0,-38); c.lineTo(10,-4); c.lineTo(-10,4); c.lineTo(0,38); c.stroke();
+}
+function drawSpiralSigil(c,col){ c.strokeStyle=col; c.lineWidth=6; c.lineCap="round"; c.fillStyle="none";
+  c.beginPath(); let r=2;
+  for(let a=0;a<Math.PI*6;a+=0.2){ r=2+a*2.2; const x=Math.cos(a)*r, y=Math.sin(a)*r; if(a===0) c.moveTo(x,y); else c.lineTo(x,y); }
+  c.stroke();
+}
+function drawTriSigil(c,col){ c.strokeStyle=col; c.lineWidth=6; c.lineJoin="round"; c.fillStyle="none";
+  c.beginPath(); c.moveTo(0,-36); c.lineTo(32,26); c.lineTo(-32,26); c.closePath(); c.stroke();
+  c.beginPath(); c.arc(0,-4,7,0,Math.PI*2); c.fillStyle=col; c.fill();
+}
+function drawCompassRose(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=4;
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; const len = i%2===0?38:20;
+    c.save(); c.rotate(a); c.beginPath(); c.moveTo(0,0); c.lineTo(-6,-len*0.3); c.lineTo(0,-len); c.lineTo(6,-len*0.3); c.closePath(); c.fill(); c.restore(); }
+}
+function drawKeyGlyph(c,col){ c.strokeStyle=col; c.fillStyle=col; c.lineWidth=6; c.fillStyle="none";
+  c.beginPath(); c.arc(0,-20,14,0,Math.PI*2); c.stroke();
+  c.beginPath(); c.moveTo(0,-6); c.lineTo(0,38); c.stroke();
+  c.beginPath(); c.moveTo(0,22); c.lineTo(14,22); c.stroke();
+  c.beginPath(); c.moveTo(0,34); c.lineTo(12,34); c.stroke();
+}
+
+const SYMBOLS = {
+  Ancient: [["Sun",drawSun],["Tree of Life",drawTree],["Mountain",drawMountain],["Wave",drawWave],["Eye",drawEye],["Flame",drawFlame]],
+  Real: [["Star",drawStar],["Crescent",drawCrescent],["Chevron",drawChevron],["Cross",drawCross],["Laurel",drawLaurel],["Anchor",drawAnchor]],
+  Fictional: [["Rune-bolt",drawRuneBolt],["Spiral sigil",drawSpiralSigil],["Tri-sigil",drawTriSigil],["Compass rose",drawCompassRose],["Key glyph",drawKeyGlyph],["Flame",drawFlame]]
+};
+
+let symTab = "Ancient";
+let activeSymbol = SYMBOLS.Ancient[0];
+
+function buildSymTabs(){
+  const wrap = $("#symTabs"); wrap.innerHTML="";
+  Object.keys(SYMBOLS).forEach(k=>{
+    const b = el("button"); b.textContent=k;
+    if(k===symTab) b.classList.add("active");
+    b.onclick=()=>{ symTab=k; buildSymTabs(); buildSymGrid(); };
+    wrap.appendChild(b);
+  });
+}
+function buildSymGrid(){
+  const wrap = $("#symGrid"); wrap.innerHTML="";
+  SYMBOLS[symTab].forEach(entry=>{
+    const [name,fn] = entry;
+    const b = el("button");
+    if(entry===activeSymbol) b.classList.add("active");
+    const c = document.createElement("canvas"); c.width=88; c.height=88;
+    const cc = c.getContext("2d"); cc.translate(44,44); cc.scale(0.9,0.9);
+    fn(cc, "#e9e8f0");
+    b.appendChild(c);
+    b.title = name;
+    b.onclick = ()=>{ activeSymbol=entry; setTool("stamp"); buildSymGrid(); };
+    wrap.appendChild(b);
+  });
+}
+buildSymTabs(); buildSymGrid();
+
+/* ---------- tools ---------- */
+const TOOLS = [["brush","✏️","Brush"],["eraser","🧽","Eraser"],["stamp","🔖","Stamp"],["dropper","💧","Eyedrop"]];
+let currentTool = "brush";
+function setTool(t){ currentTool=t; buildTools(); }
+function buildTools(){
+  const wrap = $("#toolTray"); wrap.innerHTML="";
+  TOOLS.forEach(([id,ic,label])=>{
+    const b = el("button","tool"+(id===currentTool?" active":""));
+    b.innerHTML = '<span class="ic">'+ic+'</span>'+label;
+    b.onclick = ()=> setTool(id);
+    wrap.appendChild(b);
+  });
+}
+buildTools();
+
+/* ---------- toast ---------- */
+let toastTimer=null;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ---------- pointer helpers ---------- */
+function isPencil(e){
+  if(e.pointerType==="pen") return true;
+  return $("#devMode").checked;
+}
+function toCanvasPoint(e){
+  const rect = visible.getBoundingClientRect();
+  return {
+    x: (e.clientX-rect.left) * (W/rect.width),
+    y: (e.clientY-rect.top) * (H/rect.height)
+  };
+}
+function getTiltAngle(e){
+  // prefer WebKit's altitude/azimuth when present, else derive from tiltX/tiltY
+  if(typeof e.azimuthAngle === "number" && !isNaN(e.azimuthAngle)){
+    return { azimuth: e.azimuthAngle, altitude: e.altitudeAngle||0 };
+  }
+  const tx = e.tiltX||0, ty=e.tiltY||0;
+  const azimuth = Math.atan2(ty,tx);
+  const altitude = Math.PI/2 - Math.min(Math.sqrt(tx*tx+ty*ty)*(Math.PI/180), Math.PI/2);
+  return { azimuth, altitude };
+}
+
+/* ---------- HUD ---------- */
+function updateHud(e){
+  if(e.pointerType!=="pen") return;
+  const p = Math.max(0, Math.min(1, e.pressure||0));
+  $("#hudPressure").style.width = (p*100)+"%";
+  const {azimuth,altitude} = getTiltAngle(e);
+  const tiltMag = Math.max(0, 1 - altitude/(Math.PI/2)); // 0 upright .. 1 flat
+  const dot = $("#hudTilt");
+  dot.style.left = (50 + Math.cos(azimuth)*tiltMag*8)+"px";
+  dot.style.top = (50 + Math.sin(azimuth)*tiltMag*8)+"px";
+  $("#hudAzimuth").style.transform = "rotate("+(azimuth+Math.PI/2)+"rad)";
+}
+
+/* ---------- squeeze emulation ---------- */
+let pressHistory = [];
+let lastSqueeze = 0;
+function checkSqueeze(e){
+  if(e.pointerType!=="pen") return;
+  const now = performance.now();
+  pressHistory.push({t:now, p:e.pressure||0});
+  pressHistory = pressHistory.filter(h=>now-h.t < 200);
+  if(now - lastSqueeze < 700) return;
+  const minP = Math.min(...pressHistory.map(h=>h.p));
+  const maxP = Math.max(...pressHistory.map(h=>h.p));
+  if(pressHistory.length>=2 && (maxP-minP) > 0.5 && maxP>0.82){
+    lastSqueeze = now;
+    triggerSqueeze(e.clientX, e.clientY);
+  }
+}
+const RADIAL_OPTS = [["brush","✏️"],["eraser","🧽"],["stamp","🔖"],["dropper","💧"],["undo","↩︎"]];
+function triggerSqueeze(x,y){
+  const r = $("#radial");
+  r.style.left = x+"px"; r.style.top = y+"px";
+  r.querySelectorAll(".opt").forEach(o=>o.remove());
+  const n = RADIAL_OPTS.length;
+  RADIAL_OPTS.forEach((entry,i)=>{
+    const a = (i/n)*Math.PI*2 - Math.PI/2;
+    const o = el("div","opt");
+    o.textContent = entry[1];
+    o.style.left = (95+Math.cos(a)*68)+"px";
+    o.style.top = (95+Math.sin(a)*68)+"px";
+    o.dataset.id = entry[0];
+    r.appendChild(o);
+  });
+  r.classList.add("open");
+  if(navigator.vibrate) navigator.vibrate(8);
+  clearTimeout(r._closeTimer);
+  r._closeTimer = setTimeout(closeRadial, 2600);
+}
+function closeRadial(){ $("#radial").classList.remove("open"); }
+function pickRadialAt(x,y){
+  const r = $("#radial");
+  if(!r.classList.contains("open")) return;
+  const rect = r.getBoundingClientRect();
+  const opts = [...r.querySelectorAll(".opt")];
+  let best=null, bestD=1e9;
+  opts.forEach(o=>{
+    const orect = o.getBoundingClientRect();
+    const cx = orect.left+orect.width/2, cy=orect.top+orect.height/2;
+    const d = Math.hypot(x-cx,y-cy);
+    if(d<bestD){ bestD=d; best=o; }
+  });
+  opts.forEach(o=>o.classList.toggle("hot", o===best && bestD<44));
+  if(best && bestD<44) return best.dataset.id;
+  return null;
+}
+$("#squeezePad").addEventListener("pointerdown",(e)=>{
+  e.preventDefault();
+  const rect = $("#squeezePad").getBoundingClientRect();
+  triggerSqueeze(rect.left+rect.width/2, rect.top - 40);
+});
+$("#radial").addEventListener("pointermove",(e)=>{ pickRadialAt(e.clientX,e.clientY); });
+$("#radial").addEventListener("pointerup",(e)=>{
+  const id = pickRadialAt(e.clientX,e.clientY);
+  if(id==="undo") undo(); else if(id) setTool(id);
+  closeRadial();
+});
+$("#radial").addEventListener("pointerdown",(e)=>e.preventDefault());
+
+/* ---------- drawing state ---------- */
+let stroke = null;       // {points:[], layer}
+let placing = null;      // stamp placement in progress {down:{x,y}, azimuth, scale}
+let hoverPt = null;
+
+function brushWidth(pressure){ return 4 + pressure*34; }
+
+function beginStroke(pt, e){
+  const layer = layers[activeLayer];
+  if(layer.locked){ toast("This layer is locked."); return; }
+  if(!layer.visible){ toast("This layer is hidden — show it to draw on it."); return; }
+  pushUndo(layer);
+  stroke = { pts:[pt], layer };
+  drawDot(layer.ctx, pt, e);
+}
+function drawDot(ctx, pt, e){
+  const pressure = Math.max(0.12, e.pressure||0.4);
+  const {azimuth, altitude} = getTiltAngle(e);
+  const w = brushWidth(pressure);
+  const tiltMag = Math.max(0, 1 - altitude/(Math.PI/2));
+
+  ctx.save();
+  if(currentTool==="eraser"){
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "rgba(0,0,0,1)";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = currentColor;
+    ctx.globalAlpha = 0.55 + pressure*0.45;
+  }
+  // shaded "graphite" edge when tilted
+  if(currentTool==="brush" && tiltMag>0.15){
+    ctx.save();
+    ctx.globalAlpha = (ctx.globalAlpha||1) * 0.35;
+    const ox = Math.cos(azimuth)*w*tiltMag*1.6;
+    const oy = Math.sin(azimuth)*w*tiltMag*1.6;
+    ctx.beginPath();
+    ctx.ellipse(pt.x+ox, pt.y+oy, w*0.9*(0.5+tiltMag), w*0.5, azimuth, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, w/2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+function extendStroke(pt, e){
+  if(!stroke) return;
+  const ctx = stroke.layer.ctx;
+  const prev = stroke.pts[stroke.pts.length-1];
+  const pressure = Math.max(0.12, e.pressure||0.4);
+  const w = brushWidth(pressure);
+  ctx.save();
+  if(currentTool==="eraser"){ ctx.globalCompositeOperation="destination-out"; ctx.strokeStyle="rgba(0,0,0,1)"; }
+  else { ctx.globalCompositeOperation="source-over"; ctx.strokeStyle=currentColor; ctx.globalAlpha=0.55+pressure*0.45; }
+  ctx.lineWidth = w; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(pt.x,pt.y); ctx.stroke();
+  ctx.restore();
+  drawDot(ctx, pt, e);
+  stroke.pts.push(pt);
+}
+function endStroke(){
+  if(stroke){ stroke.layer.hasContent = true; }
+  stroke = null;
+  renderComposite();
+}
+
+/* ---------- stamp placement ---------- */
+function drawGhost(pt, azimuth, scale){
+  gctx.clearRect(0,0,W,H);
+  gctx.save();
+  gctx.globalAlpha = 0.55;
+  gctx.translate(pt.x, pt.y);
+  gctx.rotate(azimuth);
+  gctx.scale(scale, scale);
+  activeSymbol[1](gctx, currentColor);
+  gctx.restore();
+}
+function commitStamp(pt, azimuth, scale){
+  const layer = layers[activeLayer];
+  if(layer.locked){ toast("This layer is locked."); return; }
+  pushUndo(layer);
+  const ctx = layer.ctx;
+  ctx.save();
+  ctx.translate(pt.x, pt.y);
+  ctx.rotate(azimuth);
+  ctx.scale(scale, scale);
+  activeSymbol[1](ctx, currentColor);
+  ctx.restore();
+  layer.hasContent = true;
+  symbolsPlaced++;
+  gctx.clearRect(0,0,W,H);
+  renderComposite();
+}
+
+/* ---------- eyedropper ---------- */
+function eyedrop(pt){
+  const d = vctx.getImageData(Math.round(pt.x),Math.round(pt.y),1,1).data;
+  if(d[3]===0) return;
+  currentColor = "rgb("+d[0]+","+d[1]+","+d[2]+")";
+  toast("Picked a color from the flag.");
+}
+
+/* ---------- pointer wiring on canvas ---------- */
+let isDown = false;
+visible.addEventListener("pointerdown",(e)=>{
+  updateHud(e);
+  if(!isPencil(e)){
+    toast("✏️ Apple Pencil required — no hand marks on this flag.");
+    return;
+  }
+  e.preventDefault();
+  try{ visible.setPointerCapture(e.pointerId); }catch(err){}
+  isDown = true;
+  pressHistory = [{t:performance.now(), p:e.pressure||0}];
+  const pt = toCanvasPoint(e);
+  $("#pencilDot").style.opacity = 1;
+  if(currentTool==="dropper"){ eyedrop(pt); isDown=false; return; }
+  if(currentTool==="stamp"){
+    const {azimuth} = getTiltAngle(e);
+    placing = { start: pt, azimuth };
+    drawGhost(pt, azimuth, 1);
+    return;
+  }
+  beginStroke(pt, e);
+});
+visible.addEventListener("pointermove",(e)=>{
+  updateHud(e);
+  const rect = visible.getBoundingClientRect();
+  const dot = $("#pencilDot");
+  dot.style.left = (e.clientX-rect.left)+"px";
+  dot.style.top = (e.clientY-rect.top)+"px";
+  if(e.pointerType==="pen") dot.style.opacity = isDown?1:0.5;
+
+  if(!isPencil(e)) return;
+  checkSqueeze(e);
+  const pt = toCanvasPoint(e);
+
+  if(currentTool==="stamp" && !isDown){
+    const {azimuth} = getTiltAngle(e);
+    drawGhost(pt, azimuth, 1);
+    return;
+  }
+  if(currentTool==="stamp" && isDown && placing){
+    const {azimuth} = getTiltAngle(e);
+    const dist = Math.hypot(pt.x-placing.start.x, pt.y-placing.start.y);
+    const scale = 1 + Math.min(dist/120, 2.2);
+    placing.azimuth = azimuth; placing.scale = scale;
+    drawGhost(placing.start, azimuth, scale);
+    return;
+  }
+  if(!isDown) return;
+  e.preventDefault();
+  extendStroke(pt, e);
+});
+function finishPointer(e){
+  if(!isPencil(e) && !isDown){ return; }
+  isDown = false;
+  $("#pencilDot").style.opacity = 0;
+  if(currentTool==="stamp" && placing){
+    commitStamp(placing.start, placing.azimuth||0, placing.scale||1);
+    placing = null;
+    return;
+  }
+  endStroke();
+}
+visible.addEventListener("pointerup", finishPointer);
+visible.addEventListener("pointercancel", finishPointer);
+visible.addEventListener("pointerleave",(e)=>{ $("#pencilDot").style.opacity=0; });
+visible.addEventListener("contextmenu",(e)=>e.preventDefault());
+
+/* ---------- present / scoring ---------- */
+function analyzeFlag(){
+  renderComposite();
+  const sw = 150, sh = 100;
+  const tmp = document.createElement("canvas"); tmp.width=sw; tmp.height=sh;
+  const tctx = tmp.getContext("2d");
+  tctx.drawImage(visible,0,0,sw,sh);
+  const data = tctx.getImageData(0,0,sw,sh).data;
+
+  const fieldColor = hexToRgb(layers[0].hasContent ? sampleFieldColor() : "#FFFFFF");
+  const seen = new Set();
+  let inkPixels = 0, total=0;
+  for(let i=0;i<data.length;i+=4){
+    const a = data[i+3]; if(a<10) continue;
+    total++;
+    const r=data[i],g=data[i+1],b=data[i+2];
+    let nearest=null, nd=1e9;
+    for(const hex of PALETTE){
+      const rc = hexToRgb(hex);
+      const d = (r-rc.r)**2+(g-rc.g)**2+(b-rc.b)**2;
+      if(d<nd){ nd=d; nearest=hex; }
+    }
+    if(nd < 4000) seen.add(nearest);
+    const isFieldColor = Math.abs(r-fieldColor.r)<10 && Math.abs(g-fieldColor.g)<10 && Math.abs(b-fieldColor.b)<10;
+    if(!isFieldColor) inkPixels++;
+  }
+  const colorCount = seen.size;
+  const inkCoverage = total? inkPixels/total : 0;
+
+  const checks = [];
+  const simple = colorCount<=5 && symbolsPlaced<=6;
+  checks.push({pass:simple, title:"Keep it simple", note: simple? "A child could redraw this from memory." : "That's a lot of colors and charges for a flag seen at a distance."});
+
+  const meaningful = symbolsPlaced>=1 || inkCoverage>0.03;
+  checks.push({pass:meaningful, title:"Meaningful symbolism", note: meaningful? "There's something specific here, not just a blank field." : "Right now it's close to an empty field — give it a charge or a mark that means something."});
+
+  const colorsGood = colorCount>=2 && colorCount<=3;
+  checks.push({pass:colorsGood, title:"2–3 basic colors", note: colorCount<2 ? "Almost monochrome — a second color would help it read." : colorsGood ? "Clean palette." : "More than 3 colors starts to muddy a flag at a distance."});
+
+  checks.push({pass:true, title:"No lettering or seals", note:"No text tool here on purpose — you resisted the urge to caption it."});
+
+  const distinctive = symbolsPlaced>=1 && colorCount>=2;
+  checks.push({pass:distinctive, title:"Distinctive & related", note: distinctive? "It says something particular about who they are." : "It could currently belong to almost anyone — tie it more to their story."});
+
+  if(inkCoverage < 0.01){
+    checks.forEach(c=>c.pass=false);
+    checks[1].note = "This flag is essentially blank. Draw or stamp something before presenting it.";
+  }
+
+  const passCount = checks.filter(c=>c.pass).length;
+  return { checks, passCount, colorCount, inkCoverage, symbolsPlaced };
+}
+function sampleFieldColor(){
+  const d = layers[0].ctx.getImageData(2,2,1,1).data;
+  return "rgb("+d[0]+","+d[1]+","+d[2]+")";
+}
+function hexToRgb(c){
+  if(c.startsWith("rgb")){ const m=c.match(/\d+/g); return {r:+m[0],g:+m[1],b:+m[2]}; }
+  const v = parseInt(c.slice(1),16);
+  return { r:(v>>16)&255, g:(v>>8)&255, b:v&255 };
+}
+const GRADE_LABELS = ["Back to the Drafting Table","Needs Work","Serviceable","Strong Banner","Vexillologically Sound","Vexillologically Sound"];
+
+function openPresent(){
+  const result = analyzeFlag();
+  $("#prName").textContent = "The " + subject.polity + " of " + subject.name;
+  $("#prScore").textContent = result.passCount+"/5";
+  $("#prLabel").textContent = GRADE_LABELS[result.passCount];
+  const list = $("#prChecklist"); list.innerHTML="";
+  result.checks.forEach(c=>{
+    const row = el("div","citem");
+    row.innerHTML = '<div class="mark">'+(c.pass?"✅":"⚠️")+'</div><div class="txt"><b>'+c.title+'</b><span>'+c.note+'</span></div>';
+    list.appendChild(row);
+  });
+  openDrawer("#presentDrawer");
+}
+$("#presentBtn").onclick = openPresent;
+$("#prClose").onclick = ()=>closeDrawer("#presentDrawer");
+$("#prNew").onclick = ()=>{ closeDrawer("#presentDrawer"); startNewFlag(true); };
+$("#prSave").onclick = ()=>{
+  renderComposite();
+  const a = document.createElement("a");
+  a.download = "flag-of-"+subject.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")+".png";
+  a.href = visible.toDataURL("image/png");
+  a.click();
+};
+
+/* ---------- drawers ---------- */
+function openDrawer(sel){ $(sel).classList.add("open"); }
+function closeDrawer(sel){ $(sel).classList.remove("open"); }
+$("#subjectBtn").onclick = ()=>openDrawer("#subjectDrawer");
+$("#drClose").onclick = ()=>closeDrawer("#subjectDrawer");
+$("#howToBtn").onclick = ()=>openDrawer("#howToDrawer");
+$("#htClose").onclick = ()=>closeDrawer("#howToDrawer");
+
+/* ---------- new flag / subject flow ---------- */
+function startNewFlag(skipConfirm){
+  const doIt = ()=>{ newSubject(); initLayers(); openDrawer("#subjectDrawer"); };
+  if(skipConfirm){ doIt(); return; }
+  const hasWork = layers.some((l,i)=> i>0 && l.hasContent);
+  if(hasWork && !confirm("Start a new subject? Your current flag will be lost unless you saved it.")) return;
+  doIt();
+}
+$("#newSubjectBtn").onclick = ()=>startNewFlag(false);
+
+/* ---------- boot ---------- */
+newSubject();
+initLayers();
+setTimeout(()=>openDrawer("#subjectDrawer"), 300);
+
+})();
+</script>
+</body>
+</html>
