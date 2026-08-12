@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Concepts">
+  <meta name="description" content="Swipeable cards, sandbox labs, and quizzes for AI and Claude concepts.">
+  <meta name="theme-color" content="#0d0c0b">
+  <title>Claude Concepts</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d0c0b'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23d97757' font-family='sans-serif'%3E%E2%9C%B3%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <button class="icon-btn" id="back" hidden aria-label="Back">‹</button>
+      <div class="brand"><span class="spark">✳</span> Concepts</div>
+      <div class="crumb" id="crumb"></div>
+      <div class="grow"></div>
+      <button class="icon-btn" id="saved-btn" aria-label="Saved cards">★</button>
+    </div>
+    <main id="main"></main>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="concepts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
