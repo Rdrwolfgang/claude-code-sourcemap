@@ -46,3 +46,29 @@ for (const t of targets) {
   await Bun.write(t, built);
   console.log(`${(built.length / 1024).toFixed(0)} KB → ${t}`);
 }
+
+// --fragment=<path> emits the same app without the document skeleton, for hosts
+// that supply their own <html>/<head>/<body> (e.g. publishing it as an Artifact).
+const fragArg = process.argv.find((a) => a.startsWith('--fragment='));
+if (fragArg) {
+  const body = html.match(/<body>([\s\S]*?)<\/body>/);
+  if (!body) throw new Error('could not find <body> in index.html');
+
+  const markup = body[1]
+    .replace(/[ \t]*<script src="(concepts|app)\.js"><\/script>\n?/g, '')
+    .trim();
+
+  const fragment = [
+    '<title>Claude Concepts</title>',
+    `<style>\n${css.trimEnd()}\n</style>`,
+    markup,
+    `<script>\n${concepts.trimEnd()}\n</script>`,
+    `<script>\n${app.trimEnd()}\n</script>`,
+  ].join('\n\n') + '\n';
+
+  if (/<!DOCTYPE|<html|<body/i.test(fragment)) throw new Error('fragment must not carry a document skeleton');
+
+  const path = fragArg.slice('--fragment='.length);
+  await Bun.write(path, fragment);
+  console.log(`${(fragment.length / 1024).toFixed(0)} KB → ${path} (fragment)`);
+}

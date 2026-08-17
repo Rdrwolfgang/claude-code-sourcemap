@@ -52,6 +52,8 @@
   var toastEl = document.getElementById('toast');
   var toastTimer;
 
+  var TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
   function h(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -350,8 +352,10 @@
         '<button class="saved' + (star ? ' on' : '') + '" data-star="' + c.id + '" aria-label="Save card">' +
           (star ? '★' : '☆') + '</button>' +
       '</div>' +
-      '<h3>' + h(c.term) + '</h3>' +
-      '<p class="summary">' + h(c.summary) + '</p>' +
+      '<div class="front">' +
+        '<h3>' + h(c.term) + '</h3>' +
+        '<p class="summary">' + h(c.summary) + '</p>' +
+      '</div>' +
       '<div class="back" hidden>' +
         '<div class="divider"></div>' +
         '<p class="body">' + h(c.body) + '</p>' +
@@ -389,7 +393,9 @@
           '<button class="round know" id="know" aria-label="Got it">✓</button>' +
           '<button class="round small" id="flip" aria-label="Flip card">↻</button>' +
         '</div>' +
-        '<p class="hint">Swipe or use ← → · space flips · S saves · U undoes</p>' +
+        '<p class="hint">' + (TOUCH
+          ? 'Swipe left to see it again · right for got it · tap to flip'
+          : 'Swipe or use ← → · space flips · S saves · U undoes') + '</p>' +
       '</div>';
 
     var behind = main.querySelector('.card.behind');
@@ -430,6 +436,7 @@
     var back = card.querySelector('.back');
     var open = force === true ? true : back.hidden;
     back.hidden = !open;
+    card.classList.toggle('flipped', open);
     state.flipped = open;
     card.querySelector('.flip-hint').textContent = open ? 'Tap to hide' : 'Tap to reveal';
   }
@@ -439,11 +446,16 @@
     var know = card.querySelector('.stamp.know');
     var again = card.querySelector('.stamp.again');
 
+    // commit distance scales with the card, so a phone needs a phone-sized swipe
+    function threshold() {
+      return Math.max(56, Math.min(95, card.offsetWidth * 0.24));
+    }
+
     card.addEventListener('pointerdown', function (e) {
       if (e.target.closest('[data-star]')) return;
       dragging = true; moved = false; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY; dx = 0; dy = 0; t0 = Date.now();
-      card.setPointerCapture(pid);
+      try { card.setPointerCapture(pid); } catch (err) { /* capture is an optimisation, not a requirement */ }
       card.classList.add('dragging');
       card.style.transition = 'none';
     });
@@ -456,8 +468,8 @@
       // let vertical scrolling through when the gesture is clearly vertical
       if (Math.abs(dy) > Math.abs(dx) * 1.6 && Math.abs(dx) < 24) return;
       card.style.transform = 'translate(' + dx + 'px,' + dy * 0.25 + 'px) rotate(' + dx / 22 + 'deg)';
-      know.style.opacity = Math.max(0, Math.min(1, dx / 90));
-      again.style.opacity = Math.max(0, Math.min(1, -dx / 90));
+      know.style.opacity = Math.max(0, Math.min(1, dx / threshold()));
+      again.style.opacity = Math.max(0, Math.min(1, -dx / threshold()));
     });
 
     function end(e) {
@@ -465,8 +477,8 @@
       dragging = false;
       card.classList.remove('dragging');
       try { card.releasePointerCapture(pid); } catch (err) { /* ignore */ }
-      var quick = Date.now() - t0 < 250 && Math.abs(dx) > 45;
-      if (Math.abs(dx) > 95 || quick) { fly(card, dx > 0 ? 1 : -1); return; }
+      var quick = Date.now() - t0 < 280 && Math.abs(dx) > 40;   // a flick counts
+      if (Math.abs(dx) > threshold() || quick) { fly(card, dx > 0 ? 1 : -1); return; }
       card.style.transition = 'transform .22s cubic-bezier(.2,.9,.3,1)';
       card.style.transform = '';
       know.style.opacity = 0; again.style.opacity = 0;
